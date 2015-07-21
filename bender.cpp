@@ -111,23 +111,46 @@ public:
 		int tries = 0;
 		Direction direction = heading;
 
-		while (tries < 4)
+		Position nextPosition = pos.GetNextPosition(heading);
+		TileBase *tile = tileDict[nextPosition];
+
+		if (tile->PreMove(*this))
 		{
-			Position nextPosition = pos.GetNextPosition(heading);
+			direction = heading;
+			tile->OnMove(*this);
+			return direction;
+		}
+
+		Direction *turnPriority;
+
+		if (inverted)
+		{
+			turnPriority = new Direction[4] { W, N, E, S };
+		}
+		else
+		{
+			turnPriority = new Direction[4] { S, E, N, W };
+		}
+
+		for (int i = 0; i < 4; i++)
+		{
+			Position nextPosition = pos.GetNextPosition(turnPriority[i]);
 			TileBase *tile = tileDict[nextPosition];
 
 			if (tile->PreMove(*this))
 			{
-				direction = heading;
+				direction = turnPriority[i];
+				heading = turnPriority[i];
 				tile->OnMove(*this);
 				break;
 			}
 			else
 			{
 				tries++;
-				Turn();
 			}
 		}
+
+		delete[] turnPriority;
 
 		if (tries >= 4)
 		{
@@ -297,7 +320,7 @@ public:
 
 	void Run()
 	{
-		while (moves < 1000000 && player->GetState() == PLAYER_MOVING)
+		while (moves < loopThreshold && player->GetState() == PLAYER_MOVING)
 		{
 			Direction direction = player->Advance(tileDict);
 			switch (direction)
@@ -394,7 +417,7 @@ private:
 	TileDict tileDict;
 	Player *player = nullptr;
 	Tile<Position> *teleporterA = nullptr;
-	const int loopThreshold = 1000000;
+	const int loopThreshold = 1000;
 	unsigned long moves = 0;
 	vector<string> moveHistory;
 
@@ -434,7 +457,7 @@ private:
 		{
 			if (player.IsBreaker())
 			{
-				tileData = new bool(true);
+				*tileData = new bool(true);
 			}
 		};
 
@@ -461,7 +484,11 @@ private:
 		case 'W':
 			direction = W;
 			break;
+		case 'S':
+			direction = S;
+			break;
 		default:
+			cerr << "UNRECOGNIZED DIRECTION SYMBOL " << symbol << endl;
 			break;
 		}
 
@@ -501,6 +528,10 @@ private:
 		{
 			teleporterA->SetTileData(new Position(position));
 			tile->SetTileData(new Position(teleporterA->GetPosition()));
+		}
+		else
+		{
+			teleporterA = tile;
 		}
 
 		return tile;
